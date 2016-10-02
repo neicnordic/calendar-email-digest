@@ -234,10 +234,10 @@ def get_config(argv):
         if not os.path.isdir(config.template_dir):
             argparser.error("%s template not specified." % long)
         try:
-            f = open(os.path.join(config.template_dir, attr + '.tmpl'))
+            f = open(os.path.join(config.template_dir, attr + '.templ'))
         except:
             raise
-            argparser.error("%s template not specified, and no %s.tmpl present in template_dir %r." % (long, attr, config.template_dir))
+            argparser.error("%s template not specified, and no %s.templ present in template_dir %r." % (long, attr, config.template_dir))
         setattr(config, attr, f)
 
     def pluralize(name, items, plural=None):
