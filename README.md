@@ -1,10 +1,10 @@
 # calendar-email-digest
 Send email digests of upcoming events from a Google calendar.
 
-## Requirements
+## Prerequisites
 
 1. Python3
-2. python-requests module (eg `pip3 install requests`).
+2. Requests module (eg `$ pip3 install requests`).
 
 ## Usage
 
@@ -82,7 +82,7 @@ optional:
 
 ## Configuration
 
-Reads .ini style configfile from `/etc/calendar-summary-email.conf` (if any). Use `--config-file /path/to/secret.conf` on command line to read additional config file(s). This is useful for example for separating access keys and passwords from general config. 
+Reads .ini style configfile from `/etc/calendar-summary-email.conf` (if exists). Use `--config-file /path/to/secret.conf` on command line to read additional config file(s). This is useful for example for separating access keys and passwords from general config. 
 
 See [etc/example.conf](etc/example.conf) for an example configuration.
 
