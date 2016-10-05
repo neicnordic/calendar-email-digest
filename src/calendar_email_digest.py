@@ -23,7 +23,7 @@ def logfile(arg):
     if arg == '-':
         return sys.stderr
     try:
-        return open(arg, mode='ab')
+        return open(arg, mode='a')
     except:
         raise argparse.ArgumentTypeError('Cannot open %r for appending.' % arg)
     
@@ -38,13 +38,13 @@ configfile_params = (
         type=argparse.FileType(mode='r'),
         metavar="FILE",
         action='append')),
-    (('--section', '-S'), dict(help="Specify config file section", metavar='NAME')),
+    (('--section', '-s'), dict(help="Specify config file section", metavar='NAME')),
     )
 
 params = (
     (('--key', '-k'), dict(help="Google calendar access key.")),
     (('--calendar-id', '-i'), dict(help="Google calendar ID.")),
-    (('--subject', '-s'), dict(help="Email subject.")),
+    (('--subject', '-S'), dict(help="Email subject.")),
     (('--recipient', '-r'), dict(help="Recipient address.", dest='recipient')),
     (('--sender', '-f'), dict(help="Sender address.", dest='sender')),
     )
