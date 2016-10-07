@@ -5,6 +5,7 @@ Send email digests of upcoming events from a Google calendar.
 
 1. Python3
 2. Requests module (eg `$ pip3 install requests`).
+3. A server access key to a google calendar, configured to be usable from the IP address where this program will run.
 
 ## Usage
 
