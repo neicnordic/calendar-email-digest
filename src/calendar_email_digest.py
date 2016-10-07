@@ -42,7 +42,7 @@ configfile_params = (
     )
 
 params = (
-    (('--key', '-k'), dict(help="Google calendar access key.")),
+    (('--key', '-k'), dict(help="Google calendar access key. Must be enabled for this machine's IP address.")),
     (('--calendar-id', '-i'), dict(help="Google calendar ID.")),
     (('--subject', '-S'), dict(help="Email subject.")),
     (('--recipient', '-r'), dict(help="Recipient address.", dest='recipient')),
@@ -70,7 +70,9 @@ optional_params = (
     (('--port', '-p'), dict(help="SMTP mail server port.", type=int, default=0)),
     (('--username', '-U'), dict(help="SMTP username.")),
     (('--password', '-P'), dict(help="SMTP password.")),
-    (('--outfile', '-o'), dict(help="Save a copy of the generated email.", metavar="FILE", type=argparse.FileType('w'))),
+    (('--textfile', '-T'), dict(help="Save a copy of the generated plaintext message.", metavar="FILE", type=argparse.FileType('w'))),
+    (('--htmlfile', '-O'), dict(help="Save a copy of the generated html message.", metavar="FILE", type=argparse.FileType('w'))),
+    (('--emailfile', '-E'), dict(help="Save a copy of the generated email.", metavar="FILE", type=argparse.FileType('w'))),
     (('--loglevel', '-L'), dict(
         help="Log events of this severity or worse.", 
         metavar="LEVEL",
@@ -82,7 +84,7 @@ optional_params = (
         type=logfile,
         metavar="FILE",
         default=sys.stderr)),
-    (('--dryrun', '-R'), dict(help="Do not actually send the email.", action='store_true')),
+    (('--no-send', '-N'), dict(help="Do not actually send the email.", action='store_true')),
     (('--help', '-h'), dict(help="Show this help message and exit", action='help')),
     )
 
@@ -120,8 +122,12 @@ def parse_event(event, linkprefs):
         url=parse_url(event, linkprefs))
 
 def get_events(url, linkprefs):
-    r = requests.get(url)
-    return [parse_event(e, linkprefs) for e in json.loads(r.text)['items']]
+    text = requests.get(url).text
+    raw = json.loads(text)
+    if not 'items' in raw:
+        logging.fatal('Unexpected response from Google Calendar API:\n' + text)
+        raise RuntimeError('Unexpected response from Google Calendar API.')
+    return [parse_event(e, linkprefs) for e in raw['items']] 
     
 def datespec(event, sep):
     start = event['start']
@@ -268,18 +274,24 @@ def main(argv=None):
         logging.info('No events to report, aborting.')
         return 0
     logging.info("Found %s events", len(events))
-    logging.debug("Generating HTML message.")
-    html = generate_html_email(
-        events, config.html_template.read(), config.html_summary.read(), config.html_details.read())
     logging.debug("Generating plaintext message.")
     plaintext = generate_plaintext_email(
         events, config.plaintext_template.read(), config.plaintext_summary.read(), config.plaintext_details.read())
+    if config.textfile:
+        logging.debug("Saving plaintext copy to %s.", config.textfile.name)
+        config.textfile.write(plaintext)
+    logging.debug("Generating HTML message.")
+    html = generate_html_email(
+        events, config.html_template.read(), config.html_summary.read(), config.html_details.read())
+    if config.htmlfile:
+        logging.debug("Saving html copy to %s.", config.htmlfile.name)
+        config.htmlfile.write(html)
     logging.debug("Composing multipart email.")
     msg = compose_email(config.sender, config.recipient, config.subject, html, plaintext)
-    if config.outfile:
-        logging.debug("Saving email copy to %s.", config.outfile.name)
-        config.outfile.write(msg.as_string())
-    if config.dryrun:
+    if config.emailfile:
+        logging.debug("Saving email copy to %s.", config.emailfile.name)
+        config.emailfile.write(msg.as_string())
+    if config.no_send:
         logging.info("Dry run requested, not sending email.")
         return 0
     logging.debug("Sending email.")

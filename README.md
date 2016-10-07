@@ -11,8 +11,6 @@ Send email digests of upcoming events from a Google calendar.
 
 ```
 $ python3 src/calendar-email-digest.py -h
-
-src/calendar_email_digest.py -h
 usage: calendar_email_digest.py [--config-file FILE] [--section NAME]
                                 [--key KEY] [--calendar-id CALENDAR_ID]
                                 [--subject SUBJECT] [--recipient RECIPIENT]
@@ -24,22 +22,24 @@ usage: calendar_email_digest.py [--config-file FILE] [--section NAME]
                                 [--template-dir DIR] [--linkprefs LINKPREFS]
                                 [--host HOST] [--port PORT]
                                 [--username USERNAME] [--password PASSWORD]
-                                [--outfile FILE] [--loglevel LEVEL]
-                                [--logfile FILE] [--dryrun] [--help]
+                                [--textfile FILE] [--htmlfile FILE]
+                                [--emailfile FILE] [--loglevel LEVEL]
+                                [--logfile FILE] [--no-send] [--help]
 
 Send email digests of upcoming events from a Google calendar.
 
 configfile options:
   --config-file FILE, -c FILE
                         Read additional config file
-  --section NAME, -S NAME
+  --section NAME, -s NAME
                         Specify config file section
 
 required:
-  --key KEY, -k KEY     Google calendar access key.
+  --key KEY, -k KEY     Google calendar access key. Must be enabled for this
+                        machine's IP address.
   --calendar-id CALENDAR_ID, -i CALENDAR_ID
                         Google calendar ID.
-  --subject SUBJECT, -s SUBJECT
+  --subject SUBJECT, -S SUBJECT
                         Email subject.
   --recipient RECIPIENT, -r RECIPIENT
                         Recipient address.
@@ -72,12 +72,16 @@ optional:
                         SMTP username.
   --password PASSWORD, -P PASSWORD
                         SMTP password.
-  --outfile FILE, -o FILE
+  --textfile FILE, -T FILE
+                        Save a copy of the generated plaintext message.
+  --htmlfile FILE, -O FILE
+                        Save a copy of the generated html message.
+  --emailfile FILE, -E FILE
                         Save a copy of the generated email.
   --loglevel LEVEL, -L LEVEL
                         Log events of this severity or worse.
   --logfile FILE, -F FILE
-  --dryrun, -R          Do not actually send the email.
+  --no-send, -N         Do not actually send the email.
   --help, -h            Show this help message and exit
   ```
 
