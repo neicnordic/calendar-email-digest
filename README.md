@@ -89,7 +89,7 @@ optional:
 
 Reads .ini style configfile from `/etc/calendar-summary-email.conf` (if exists). Use `--config-file /path/to/secret.conf` on command line to read additional config file(s). This is useful for example for separating access keys and passwords from general config. 
 
-See [etc/example.conf](etc/example.conf) for an example configuration.
+See [examples/etc/example.conf](examples/etc/example.conf) for an example configuration.
 
 ## Email templates
 
@@ -104,4 +104,4 @@ Recommended: put template files in a directory and name them
 
 and then point to this directory with `--template-dir /path/to/dir` in configuration. Override individual templates if you like with eg `--html-template /path/to/file` or `--plaintext-summary /path/to/file`.
 
-See the [templ/](templ/) directory for examples.
+See the [examples/templ/](examples/templ/) directory for examples.

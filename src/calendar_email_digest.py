@@ -121,14 +121,6 @@ def parse_event(event, linkprefs):
         description=description,
         url=parse_url(event, linkprefs))
 
-def get_events(url, linkprefs):
-    text = requests.get(url).text
-    raw = json.loads(text)
-    if not 'items' in raw:
-        logging.fatal('Unexpected response from Google Calendar API:\n' + text)
-        raise RuntimeError('Unexpected response from Google Calendar API.')
-    return [parse_event(e, linkprefs) for e in raw['items']] 
-    
 def datespec(event, sep):
     start = event['start']
     end = event['end']
@@ -179,7 +171,7 @@ def compose_email(sender, recipient, subject, html, plaintext):
     msg['Subject'] = subject
     msg['From'] = sender
     msg['To'] = recipient
-    msg['Message-ID'] = make_msgid()
+    msg['Message-ID'] = make_msgid(domain='example.com')
     msg.attach(MIMEText(plaintext, 'plain', "utf-8"))
     msg.attach(MIMEText(html, 'html', "utf-8"))
     return msg
@@ -208,7 +200,7 @@ def get_config(argv):
         add_help=False
         )
     add_arguments(conf_parser.add_argument_group('configfile options'), configfile_params)
-    config, remaining_argv = conf_parser.parse_known_args()
+    config, remaining_argv = conf_parser.parse_known_args(args=argv)
     config_files = config.config_file
     section = config.section
     required_group = conf_parser.add_argument_group('required')
@@ -244,9 +236,8 @@ def get_config(argv):
         try:
             f = open(os.path.join(config.template_dir, attr + '.templ'))
         except:
-            raise
             argparser.error("%s template not specified, and no %s.templ present in template_dir %r." % (long, attr, config.template_dir))
-        setattr(config, attr, f)
+        setattr(config, attr, f.read())
 
     def pluralize(name, items, plural=None):
         if plural is None:
@@ -263,44 +254,104 @@ def get_config(argv):
 
     return config
 
-def main(argv=None):
-    if argv is None:
-        argv = sys.argv
-    config = get_config(argv)
+def get_events(config):
     url = get_url(config.key, config.calendar_id)
     logging.debug("API url %r.", url)
-    events = get_events(url, config.linkprefs)
+    text = requests.get(url).text
+    raw = json.loads(text)
+    if not 'items' in raw:
+        logging.fatal('Unexpected response from Google Calendar API:\n' + text)
+        raise RuntimeError('Unexpected response from Google Calendar API.')
+    return [parse_event(e, config.linkprefs) for e in raw['items']] 
+
+def format_events(config, events):
+    logging.debug("Generating plaintext message.")
+    plaintext = generate_plaintext_email(
+        events, config.plaintext_template, config.plaintext_summary, config.plaintext_details)
+    logging.debug("Generating HTML message.")
+    html = generate_html_email(
+        events, config.html_template, config.html_summary, config.html_details)
+    logging.debug("Composing multipart email.")
+    email = compose_email(config.sender, config.recipient, config.subject, html, plaintext)
+    return plaintext, html, email
+
+class WSGIApplication:
+    def __init__(self, config=None, section=None, configfiles=None):
+        if config is None:
+            argv = ['--section', section]
+            for f in configfiles or []:
+                argv += ['--config-file', f]
+            config = get_config(argv)
+        self.config = config
+        self.config.no_send = True
+        
+    def __call__(self, environ, start_response):
+        try:
+            status, headers, body = self.process_request(environ, start_response)
+        except:
+            from traceback import print_exc
+            print_exc()
+            status = '500 Internal server error'
+            body = [self._html_msg(status, 'Please contact the server administrator.').encode()]
+            headers = [('Content-Type', 'text/html; charset=UTF-8')]
+        start_response(status, headers)
+        return body
+
+    @classmethod
+    def _html_msg(cls, heading, details=''):
+        return "<html><body><h1>%s</h1>%s</body></html>" % (heading, details)
+    
+    def process_request(self, environ, start_response):
+        fmt = environ['PATH_INFO'].lstrip('/')
+        events = get_events(self.config)
+        plaintext, html, email = format_events(self.config, events)
+        status = '200 OK'
+        headers = [('Content-Type', 'text/html; charset=UTF-8')]
+        if fmt == '.txt':
+            body = plaintext
+            headers = [('Content-Type', 'text/plain; charset=UTF-8')]
+        elif fmt == '.html':
+            body = html
+        elif fmt == '.eml':
+            body = email.as_string()
+            headers = [('Content-Type', email.get_content_type())]
+        elif fmt == '' or fmt == '/':
+            n = os.path.split(environ['SCRIPT_NAME'])[-1]
+            items = ['<li><a href="%s">%s</a></li>' % (n+e, n+e) for e in ['.txt', '.html', '.eml']]
+            body = self._html_msg("Calendar email digest", "<ul>%s</ul>" % ''.join(items))
+        else:
+            status = '404 Not found'
+            body = self._html_msg(status)
+        body = body.encode()
+        headers += [('Content-Length', str(len(body)))]
+        return status, headers, [body]
+
+def main(config):
+    events = get_events(config)
     if not events:
         logging.info('No events to report, aborting.')
         return 0
     logging.info("Found %s events", len(events))
-    logging.debug("Generating plaintext message.")
-    plaintext = generate_plaintext_email(
-        events, config.plaintext_template.read(), config.plaintext_summary.read(), config.plaintext_details.read())
+    plaintext, html, email = format_events(config, events)
     if config.textfile:
         logging.debug("Saving plaintext copy to %s.", config.textfile.name)
         config.textfile.write(plaintext)
-    logging.debug("Generating HTML message.")
-    html = generate_html_email(
-        events, config.html_template.read(), config.html_summary.read(), config.html_details.read())
     if config.htmlfile:
         logging.debug("Saving html copy to %s.", config.htmlfile.name)
         config.htmlfile.write(html)
-    logging.debug("Composing multipart email.")
-    msg = compose_email(config.sender, config.recipient, config.subject, html, plaintext)
     if config.emailfile:
         logging.debug("Saving email copy to %s.", config.emailfile.name)
-        config.emailfile.write(msg.as_string())
+        config.emailfile.write(email.as_string())
     if config.no_send:
         logging.info("Dry run requested, not sending email.")
         return 0
     logging.debug("Sending email.")
-    send_email(msg, config.host, config.port, config.username, config.password)
+    send_email(email, config.host, config.port, config.username, config.password)
     return 0
 
 if __name__ == '__main__':
     try:
-        sys.exit(int(main()))
+        sys.exit(int(main(get_config(sys.argv))))
     except SystemExit:
         raise
     except:
