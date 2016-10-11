@@ -190,7 +190,7 @@ def add_arguments(parser, argspecs):
     for names, specs in argspecs:
         parser.add_argument(*names, **specs)
 
-def get_config(argv):
+def get_config(args):
     def attrname(argname):
         return argname.strip('-').replace('-', '_')
     
@@ -200,7 +200,7 @@ def get_config(argv):
         add_help=False
         )
     add_arguments(conf_parser.add_argument_group('configfile options'), configfile_params)
-    config, remaining_argv = conf_parser.parse_known_args(args=argv)
+    config, remaining_argv = conf_parser.parse_known_args(args=args)
     config_files = config.config_file
     section = config.section
     required_group = conf_parser.add_argument_group('required')
@@ -351,7 +351,7 @@ def main(config):
 
 if __name__ == '__main__':
     try:
-        sys.exit(int(main(get_config(sys.argv))))
+        sys.exit(int(main(get_config(sys.argv[1:])) or 0))
     except SystemExit:
         raise
     except:
