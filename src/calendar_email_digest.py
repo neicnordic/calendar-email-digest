@@ -1,8 +1,8 @@
-#!/usr/bin/env python3 
+#!/usr/bin/env python 
 """Send email digests of upcoming events from a Google calendar.
 """
 import argparse
-import configparser
+import ConfigParser
 import datetime
 import json
 import logging
@@ -13,9 +13,11 @@ import sys
     
 default_config_file = '/etc/calendar-summary-email.conf'
 
+loglevels = [name for val, name in sorted(logging._levelNames.items()) if isinstance(name, str)]
+
 def loglevel(arg):
-    for level in logging._nameToLevel:
-        if level.startswith(arg.upper()):
+    for level in logging._levelNames:
+        if isinstance(level, str) and level.startswith(arg.upper()):
             return level
     raise argparse.ArgumentTypeError('%r does not match any loglevel.' % arg)
 
@@ -77,7 +79,7 @@ optional_params = (
         help="Log events of this severity or worse.", 
         metavar="LEVEL",
         type=loglevel,
-        choices=sorted(logging._nameToLevel),
+        choices=loglevels,
         default='ERROR')),
     (('--logfile', '-F'), dict(
         help="", 
@@ -171,15 +173,13 @@ def compose_email(sender, recipient, subject, html, plaintext):
     msg['Subject'] = subject
     msg['From'] = sender
     msg['To'] = recipient
-    msg['Message-ID'] = make_msgid(domain='example.com')
+    msg['Message-ID'] = make_msgid()
     msg.attach(MIMEText(plaintext, 'plain', "utf-8"))
     msg.attach(MIMEText(html, 'html', "utf-8"))
     return msg
 
 def send_email(msg, smtp_server='localhost', smtp_port=0, smtp_username=None, smtp_password=None):
-    
     import smtplib
-    
     s = smtplib.SMTP(smtp_server, smtp_port)
     if smtp_username:        
         s.login(smtp_username, smtp_password)
@@ -214,7 +214,7 @@ def get_config(args):
     if config_files:
         if not section:
             conf_parser.error('Section not specified.')
-        cfp = configparser.ConfigParser()
+        cfp = ConfigParser.SafeConfigParser()
         cfp.read(f.name for f in config_files)
         defaults = {attrname(k):v for k, v in cfp.items(section)}
 
@@ -322,7 +322,7 @@ class WSGIApplication:
         else:
             status = '404 Not found'
             body = self._html_msg(status)
-        body = body.encode()
+        body = body.encode('utf-8')
         headers += [('Content-Length', str(len(body)))]
         return status, headers, [body]
 

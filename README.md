@@ -3,14 +3,14 @@ Send email digests of upcoming events from a Google calendar.
 
 ## Prerequisites
 
-1. Python3
-2. Requests module (eg `$ pip3 install requests`).
+1. Python 2
+2. Requests module (eg `$ pip install requests`, or `yum install python-requests`).
 3. A server access key to a google calendar, configured to be usable from the IP address where this program will run.
 
 ## Usage
 
 ```
-$ python3 src/calendar-email-digest.py -h
+$ python src/calendar-email-digest.py -h
 usage: calendar_email_digest.py [--config-file FILE] [--section NAME]
                                 [--key KEY] [--calendar-id CALENDAR_ID]
                                 [--subject SUBJECT] [--recipient RECIPIENT]
