@@ -168,12 +168,13 @@ def generate_plaintext_email(events, template, summary_template, details_templat
 def compose_email(sender, recipient, subject, html, plaintext):
     from email.mime.multipart import MIMEMultipart
     from email.mime.text import MIMEText
-    from email.utils import make_msgid
+    from email import utils
     msg = MIMEMultipart('alternative')
     msg['Subject'] = subject
     msg['From'] = sender
     msg['To'] = recipient
-    msg['Message-ID'] = make_msgid()
+    msg['Message-ID'] = utils.make_msgid()
+    msg['Date'] = utils.formatdate()
     msg.attach(MIMEText(plaintext, 'plain', "utf-8"))
     msg.attach(MIMEText(html, 'html', "utf-8"))
     return msg
