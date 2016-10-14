@@ -87,7 +87,7 @@ optional:
 
 ## Configuration
 
-Reads .ini style configfile from `/etc/calendar-summary-email.conf` (if exists). Use `--config-file /path/to/secret.conf` on command line to read additional config file(s). This is useful for example for separating access keys and passwords from general config. 
+Reads .ini style configfile from `/etc/calendar-email-digest.conf` (if exists). Use `--config-file /path/to/secret.conf` on command line to read additional config file(s). This is useful for example for separating access keys and passwords from general config. 
 
 See [examples/etc/example.conf](examples/etc/example.conf) for an example configuration.
 

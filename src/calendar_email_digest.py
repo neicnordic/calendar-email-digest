@@ -11,7 +11,7 @@ import re
 import requests
 import sys
     
-default_config_file = '/etc/calendar-summary-email.conf'
+default_config_file = '/etc/calendar-email-digest.conf'
 
 loglevels = [name for val, name in sorted(logging._levelNames.items()) if isinstance(name, str)]
 
