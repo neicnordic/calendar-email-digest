@@ -217,7 +217,8 @@ def get_config(args):
             conf_parser.error('Section not specified.')
         cfp = ConfigParser.SafeConfigParser()
         cfp.read(f.name for f in config_files)
-        defaults = {attrname(k):v for k, v in cfp.items(section)}
+        if cfp.has_section(section):
+            defaults = {attrname(k):v for k, v in cfp.items(section)}
 
     argparser = argparse.ArgumentParser(parents=[conf_parser], description=__doc__, add_help=False)
     argparser.set_defaults(**defaults)
@@ -239,7 +240,7 @@ def get_config(args):
         except:
             argparser.error("%s template not specified, and no %s.templ present in template_dir %r." % (long, attr, config.template_dir))
         setattr(config, attr, f.read())
-
+    
     def pluralize(name, items, plural=None):
         if plural is None:
             plural = name + 's'
@@ -277,14 +278,12 @@ def format_events(config, events):
     return plaintext, html, email
 
 class WSGIApplication:
-    def __init__(self, config=None, section=None, configfiles=None):
-        if config is None:
-            argv = ['--section', section]
-            for f in configfiles or []:
-                argv += ['--config-file', f]
-            config = get_config(argv)
-        self.config = config
-        self.config.no_send = True
+    def __init__(self, wsgi_section, config_files=None):
+        config_files = config_files or []
+        if os.path.isfile(default_config_file):
+            config_files.insert(0, default_config_file)
+        self.config_files = config_files
+        self.wsgi_calendars = self._get_wsgi_calendars(wsgi_section)
         
     def __call__(self, environ, start_response):
         try:
@@ -293,39 +292,61 @@ class WSGIApplication:
             from traceback import print_exc
             print_exc()
             status = '500 Internal server error'
-            body = [self._html_msg(status, 'Please contact the server administrator.').encode()]
+            body = self._html_msg(status, 'Please contact the server administrator.').encode('utf-8')
             headers = [('Content-Type', 'text/html; charset=UTF-8')]
-        start_response(status, headers)
-        return body
-
-    @classmethod
-    def _html_msg(cls, heading, details=''):
-        return "<html><body><h1>%s</h1>%s</body></html>" % (heading, details)
-    
-    def process_request(self, environ, start_response):
-        fmt = environ['PATH_INFO'].lstrip('/')
-        events = get_events(self.config)
-        plaintext, html, email = format_events(self.config, events)
-        status = '200 OK'
-        headers = [('Content-Type', 'text/html; charset=UTF-8')]
-        if fmt == '.txt':
-            body = plaintext
-            headers = [('Content-Type', 'text/plain; charset=UTF-8')]
-        elif fmt == '.html':
-            body = html
-        elif fmt == '.eml':
-            body = email.as_string()
-            headers = [('Content-Type', email.get_content_type())]
-        elif fmt == '' or fmt == '/':
-            n = os.path.split(environ['SCRIPT_NAME'])[-1]
-            items = ['<li><a href="%s">%s</a></li>' % (n+e, n+e) for e in ['.txt', '.html', '.eml']]
-            body = self._html_msg("Calendar email digest", "<ul>%s</ul>" % ''.join(items))
-        else:
-            status = '404 Not found'
-            body = self._html_msg(status)
         body = body.encode('utf-8')
         headers += [('Content-Length', str(len(body)))]
-        return status, headers, [body]
+        start_response(status, headers)
+        return [body]
+
+    def _get_calendar_config(self, section):
+        argv = ['-s', section]
+        for f in self.config_files:
+            argv += ['--config-file', f]
+        config = get_config(argv)
+        config.no_send = True
+        return config
+    
+    def _get_wsgi_calendars(self, wsgi_section):
+        wsgi_config = ConfigParser.SafeConfigParser()
+        wsgi_config.read(self.config_files)
+        if not wsgi_config.has_section(wsgi_section):
+            return []
+        val = {k.lower().replace('-', '_'):v for k, v in wsgi_config.items('wsgi')}.get('wsgi_calendars', '')
+        if not val:
+            return []
+        return [c.strip() for c in val.split(',')]
+    
+    @classmethod
+    def _html_msg(cls, heading, details=''):
+        return "<html><head><title>%s</title></head><body><h1>%s</h1>%s</body></html>" % (heading, heading, details)
+    
+    def process_request(self, environ, start_response):
+        status = '200 OK'
+        headers = [('Content-Type', 'text/html; charset=UTF-8')]
+        path = environ['PATH_INFO'].lstrip('/')
+        if not path:
+            ext = ['.txt', '.html', '.eml']
+            li = '<li><a href="%s">%s</a></li>'
+            cal = '<h2>%s</h2><ul>%s</ul>'
+            details = ''.join(cal % (c, ''.join(li % (c+e, c+e) for e in ext)) for c in self.wsgi_calendars)
+            body = self._html_msg("Calendar email digest", "<ul>%s</ul>" % details)
+            return status, headers, body
+        section, fmt = os.path.splitext(path)
+        if section not in self.wsgi_calendars or not fmt:
+            status = '404 Not found'
+            body = self._html_msg(status)
+            return status, headers, body
+        calendar_config = self._get_calendar_config(section)
+        events = get_events(calendar_config)
+        plaintext, html, email = format_events(calendar_config, events)
+        if fmt == '.html':
+            return status, headers, html
+        if fmt == '.txt':
+            return status, [('Content-Type', 'text/plain; charset=UTF-8')], plaintext
+        if fmt == '.eml':
+            return status, [('Content-Type', email.get_content_type())], email.as_string()
+        raise RuntimeError("Unreachable code reached.")
 
 def main(config):
     events = get_events(config)

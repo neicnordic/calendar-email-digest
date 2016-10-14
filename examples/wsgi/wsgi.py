@@ -1,8 +1,8 @@
 from calendar_email_digest import WSGIApplication
 
 application = WSGIApplication(
-    section='training',
-    configfiles=['etc/secret.conf']) 
+    wsgi_section='wsgi',
+    config_files=['etc/secret.conf']) 
 
 if __name__ == '__main__':
     """Make silly test server. Do not use in production."""

@@ -105,3 +105,11 @@ Recommended: put template files in a directory and name them
 and then point to this directory with `--template-dir /path/to/dir` in configuration. Override individual templates if you like with eg `--html-template /path/to/file` or `--plaintext-summary /path/to/file`.
 
 See the [examples/templ/](examples/templ/) directory for examples.
+
+## WSGI
+
+The WSGIApplication class can be used to serve previews through WSGI of how 
+generated emails will look. Instantiate with wsgi_section name and list of 
+config_files, and use the wsgi_calendars option in this section to specify comma 
+separated section names for calendars to serve previews for. 
+See [/examples/wsgi/wsgi.py](/examples/wsgi/wsgi.py) for an example.
