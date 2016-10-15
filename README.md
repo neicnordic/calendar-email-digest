@@ -106,10 +106,14 @@ and then point to this directory with `--template-dir /path/to/dir` in configura
 
 See the [examples/templ/](examples/templ/) directory for examples.
 
-## WSGI
+## WSGI mode
 
 The WSGIApplication class can be used to serve previews through WSGI of how 
 generated emails will look. Instantiate with wsgi_section name and list of 
-config_files, and use the wsgi_calendars option in this section to specify comma 
-separated section names for calendars to serve previews for. 
+config_files, and use the `wsgi_calendars` option in this section to specify comma 
+separated section names for calendars to serve previews for. The `logfile` and 
+`loglevel` options in this section to control WSGI logging (any logging conf in 
+other sections is ignored in WSGI mode). In WSGI mode `no-send` is implied; no
+email will be sent. 
+
 See [/examples/wsgi/wsgi.py](/examples/wsgi/wsgi.py) for an example.

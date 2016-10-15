@@ -191,6 +191,10 @@ def add_arguments(parser, argspecs):
     for names, specs in argspecs:
         parser.add_argument(*names, **specs)
 
+def _optionxform(optionname):
+    """Used by the configfile parsers."""
+    return optionname.lower().replace('-', '_')
+
 def get_config(args):
     def attrname(argname):
         return argname.strip('-').replace('-', '_')
@@ -216,6 +220,7 @@ def get_config(args):
         if not section:
             conf_parser.error('Section not specified.')
         cfp = ConfigParser.SafeConfigParser()
+        cfp.optionxform = _optionxform
         cfp.read(f.name for f in config_files)
         if cfp.has_section(section):
             defaults = {attrname(k):v for k, v in cfp.items(section)}
@@ -241,19 +246,6 @@ def get_config(args):
             argparser.error("%s template not specified, and no %s.templ present in template_dir %r." % (long, attr, config.template_dir))
         setattr(config, attr, f.read())
     
-    def pluralize(name, items, plural=None):
-        if plural is None:
-            plural = name + 's'
-        if len(items) == 1:
-            return name + " " + str(items[0])
-        return "%s %s and %s" % (name, ', '.join(str(it) for it in items[:-1]), items[-1]) 
-        
-    logging.basicConfig(format='%(asctime)s %(levelname)s %(message)s', stream=config.logfile, level=getattr(logging, config.loglevel))
-    logging.debug('Loglevel set to %s.', config.loglevel)
-    logging.info('Program start, config OK.')
-    if config_files:
-        logging.debug('Read section %r in %s.', section, pluralize('config file', [f.name for f in config_files]))
-
     return config
 
 def get_events(config):
@@ -278,19 +270,38 @@ def format_events(config, events):
     return plaintext, html, email
 
 class WSGIApplication:
-    def __init__(self, wsgi_section, config_files=None):
+    def __init__(self, wsgi_section=None, config_files=None, configs=None):
+        self.configs = dict(configs or {})
+        self.configs.update(self.get_calendar_configs(wsgi_section, config_files))
+
+    @classmethod
+    def get_calendar_configs(cls, wsgi_section=None, config_files=None):
         config_files = config_files or []
         if os.path.isfile(default_config_file):
             config_files.insert(0, default_config_file)
-        self.config_files = config_files
-        self.wsgi_calendars = self._get_wsgi_calendars(wsgi_section)
+        wsgi_config = ConfigParser.SafeConfigParser()
+        wsgi_config.optionxform = _optionxform
+        wsgi_config.read(config_files)
+        def get(option, default=''):
+            try:
+                return wsgi_config.get(wsgi_section, option)
+            except:
+                return default
+        raw = get('wsgi_calendars')
+        if not raw:
+            msg = "No wsgi_calendars option in section %r in config files %s"
+            raise ValueError(msg % (wsgi_section, config_files))
+        wsgi_calendars = [c.strip() for c in raw.split(',')]
+        configure_logging(get('logfile', sys.stderr), getattr(logging, get('loglevel', 'info').upper()))
+        args = sum((['--config-file', f] for f in config_files), []) + ['--no-send', '-s']
+        return {c:get_config(args + [c]) for c in wsgi_calendars}
         
     def __call__(self, environ, start_response):
         try:
             status, headers, body = self.process_request(environ, start_response)
         except:
-            from traceback import print_exc
-            print_exc()
+            from traceback import format_exc
+            logging.error(format_exc())
             status = '500 Internal server error'
             body = self._html_msg(status, 'Please contact the server administrator.').encode('utf-8')
             headers = [('Content-Type', 'text/html; charset=UTF-8')]
@@ -299,24 +310,6 @@ class WSGIApplication:
         start_response(status, headers)
         return [body]
 
-    def _get_calendar_config(self, section):
-        argv = ['-s', section]
-        for f in self.config_files:
-            argv += ['--config-file', f]
-        config = get_config(argv)
-        config.no_send = True
-        return config
-    
-    def _get_wsgi_calendars(self, wsgi_section):
-        wsgi_config = ConfigParser.SafeConfigParser()
-        wsgi_config.read(self.config_files)
-        if not wsgi_config.has_section(wsgi_section):
-            return []
-        val = {k.lower().replace('-', '_'):v for k, v in wsgi_config.items('wsgi')}.get('wsgi_calendars', '')
-        if not val:
-            return []
-        return [c.strip() for c in val.split(',')]
-    
     @classmethod
     def _html_msg(cls, heading, details=''):
         return "<html><head><title>%s</title></head><body><h1>%s</h1>%s</body></html>" % (heading, heading, details)
@@ -329,17 +322,17 @@ class WSGIApplication:
             ext = ['.txt', '.html', '.eml']
             li = '<li><a href="%s">%s</a></li>'
             cal = '<h2>%s</h2><ul>%s</ul>'
-            details = ''.join(cal % (c, ''.join(li % (c+e, c+e) for e in ext)) for c in self.wsgi_calendars)
+            details = ''.join(cal % (c, ''.join(li % (c+e, c+e) for e in ext)) for c in self.configs)
             body = self._html_msg("Calendar email digest", "<ul>%s</ul>" % details)
             return status, headers, body
-        section, fmt = os.path.splitext(path)
-        if section not in self.wsgi_calendars or not fmt:
+        cal, fmt = os.path.splitext(path)
+        if cal not in self.configs or not fmt:
             status = '404 Not found'
             body = self._html_msg(status)
             return status, headers, body
-        calendar_config = self._get_calendar_config(section)
-        events = get_events(calendar_config)
-        plaintext, html, email = format_events(calendar_config, events)
+        events = get_events(self.configs[cal])
+        logging.info("Found %s events", len(events))
+        plaintext, html, email = format_events(self.configs[cal], events)
         if fmt == '.html':
             return status, headers, html
         if fmt == '.txt':
@@ -348,7 +341,13 @@ class WSGIApplication:
             return status, [('Content-Type', email.get_content_type())], email.as_string()
         raise RuntimeError("Unreachable code reached.")
 
+def configure_logging(stream, level):
+    logging.basicConfig(format='%(asctime)s %(levelname)s %(message)s', stream=stream, level=level)
+
 def main(config):
+    configure_logging(config.logfile, getattr(logging, config.loglevel))
+    logging.info('Program start, config OK.')
+    logging.debug('Loglevel set to %s.', config.loglevel)
     events = get_events(config)
     if not events:
         logging.info('No events to report, aborting.')
