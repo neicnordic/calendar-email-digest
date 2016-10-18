@@ -270,12 +270,12 @@ def format_events(config, events):
     return plaintext, html, email
 
 class WSGIApplication:
-    def __init__(self, wsgi_section=None, config_files=None, configs=None):
+    def __init__(self, wsgi_section='wsgi', config_files=None, configs=None):
         self.configs = dict(configs or {})
         self.configs.update(self.get_calendar_configs(wsgi_section, config_files))
 
     @classmethod
-    def get_calendar_configs(cls, wsgi_section='wsgi', config_files=None):
+    def get_calendar_configs(cls, wsgi_section, config_files):
         config_files = config_files or []
         if os.path.isfile(default_config_file):
             config_files.insert(0, default_config_file)
