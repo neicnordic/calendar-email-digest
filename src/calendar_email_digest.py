@@ -206,7 +206,7 @@ def get_config(args):
         )
     add_arguments(conf_parser.add_argument_group('configfile options'), configfile_params)
     config, remaining_argv = conf_parser.parse_known_args(args=args)
-    config_files = config.config_file
+    config_files = config.config_file or []
     section = config.section
     required_group = conf_parser.add_argument_group('required')
     add_arguments(required_group, params)
