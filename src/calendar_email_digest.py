@@ -215,7 +215,7 @@ def get_config(args):
 
     defaults = dict()
     if os.path.isfile(default_config_file):
-        config_files.insert(0, default_config_file)
+        config_files.insert(0, open(default_config_file))
     if config_files:
         if not section:
             conf_parser.error('Section not specified.')
