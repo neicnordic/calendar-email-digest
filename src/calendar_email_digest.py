@@ -1,4 +1,4 @@
-#!/usr/bin/env python 
+#!/usr/bin/env python
 """Send email digests of upcoming events from a Google calendar.
 """
 import argparse
@@ -10,7 +10,7 @@ import os
 import re
 import requests
 import sys
-    
+
 default_config_file = '/etc/calendar-email-digest.conf'
 
 loglevels = [name for val, name in sorted(logging._levelNames.items()) if isinstance(name, str)]
@@ -28,7 +28,7 @@ def logfile(arg):
         return open(arg, mode='a')
     except:
         raise argparse.ArgumentTypeError('Cannot open %r for appending.' % arg)
-    
+
 def directory(arg):
     if not os.path.isdir(arg):
         raise argparse.ArgumentTypeError('%r is not a directory.' % arg)
@@ -36,7 +36,7 @@ def directory(arg):
 
 configfile_params = (
     (('--config-file', '-c'), dict(
-        help="Read additional config file", 
+        help="Read additional config file",
         type=argparse.FileType(mode='r'),
         metavar="FILE",
         action='append')),
@@ -62,7 +62,7 @@ template_params = (
 
 optional_params = (
     (('--template-dir', '-t'), dict(
-        help="Template dir with {html,plaintext}_{template,details,summary}.tmpl files.", 
+        help="Template dir with {html,plaintext}_{template,details,summary}.tmpl files.",
         metavar='DIR',
         type=directory)),
     (('--linkprefs', '-l'), dict(
@@ -76,13 +76,13 @@ optional_params = (
     (('--htmlfile', '-O'), dict(help="Save a copy of the generated html message.", metavar="FILE", type=argparse.FileType('w'))),
     (('--emailfile', '-E'), dict(help="Save a copy of the generated email.", metavar="FILE", type=argparse.FileType('w'))),
     (('--loglevel', '-L'), dict(
-        help="Log events of this severity or worse.", 
+        help="Log events of this severity or worse.",
         metavar="LEVEL",
         type=loglevel,
         choices=loglevels,
         default='ERROR')),
     (('--logfile', '-F'), dict(
-        help="", 
+        help="",
         type=logfile,
         metavar="FILE",
         default=sys.stderr)),
@@ -93,8 +93,8 @@ optional_params = (
 def get_url(key, calendar_id):
     template = 'https://www.googleapis.com/calendar/v3/calendars/%(calendar_id)s/events?key=%(key)s&timeMin=%(rfc3339now)s&orderBy=startTime&singleEvents=true'
     return template % dict(
-        key=key, 
-        calendar_id=calendar_id, 
+        key=key,
+        calendar_id=calendar_id,
         rfc3339now=datetime.datetime.utcnow().isoformat()+'Z')
 
 def parse_date(timespec):
@@ -128,15 +128,16 @@ def datespec(event, sep):
     end = event['end']
     if start == end:
         return start
-    return start + sep + end 
+    return start + sep + end
 
 def html_summary(event, template):
-    return template % dict(event, 
+    return template % dict(event,
         datespec=datespec(event, " &ndash; "))
 
 def html_details(event, index, template):
     description = re.sub(r'(https?:\/\/\S+?)(\.?([\s\n]|$))', r'<a href="\1">\1</a>\2', event['description'], flags=re.I)
-    return template % dict(event, 
+    description = re.sub(r'([A-Za-z1-9-._]+@[A-Za-z1-9-._]+\.[A-Za-z1-9]+)', r'<a href="mailto:\1">\1</a>', description, flags=re.I)
+    return template % dict(event,
         index=index,
         datespec=datespec(event, " &ndash; "),
         description=description.replace('\n', '<br>\n'))
@@ -148,13 +149,13 @@ def generate_html_email(events, template, summary_template, details_template):
         details='\n'.join(html_details(e, i + 1, details_template) for i, e in enumerate(events)))
 
 def plaintext_summary(event, index, template):
-    return template % dict(event, 
+    return template % dict(event,
         index=index,
         indent=' ' * (len(str(index)) + 2),
         datespec=datespec(event, " -- "))
 
 def plaintext_details(event, index, template):
-    return template % dict(event, 
+    return template % dict(event,
         index=index,
         datespec=datespec(event, " -- "))
 
@@ -182,7 +183,7 @@ def compose_email(sender, recipient, subject, html, plaintext):
 def send_email(msg, smtp_server='localhost', smtp_port=0, smtp_username=None, smtp_password=None):
     import smtplib
     s = smtplib.SMTP(smtp_server, smtp_port)
-    if smtp_username:        
+    if smtp_username:
         s.login(smtp_username, smtp_password)
     s.sendmail(msg['From'], msg['To'], msg.as_string())
     s.quit()
@@ -198,7 +199,7 @@ def _optionxform(optionname):
 def get_config(args):
     def attrname(argname):
         return argname.strip('-').replace('-', '_')
-    
+
     conf_parser = argparse.ArgumentParser(
         description=__doc__,
         formatter_class=argparse.RawDescriptionHelpFormatter,
@@ -229,11 +230,11 @@ def get_config(args):
     argparser.set_defaults(**defaults)
     config = argparser.parse_args(remaining_argv)
     config.linkprefs = [s.strip() for s in config.linkprefs.split(',')]
-    
+
     for argnames, _ in params:
         if not getattr(config, attrname(argnames[0])):
             argparser.error("%s/%s not specified." % argnames)
-            
+
     for (long, _), _ in template_params:
         attr = attrname(long)
         if getattr(config, attr):
@@ -245,7 +246,7 @@ def get_config(args):
         except:
             argparser.error("%s template not specified, and no %s.templ present in template_dir %r." % (long, attr, config.template_dir))
         setattr(config, attr, f.read())
-    
+
     return config
 
 def get_events(config):
@@ -256,7 +257,7 @@ def get_events(config):
     if not 'items' in raw:
         logging.fatal('Unexpected response from Google Calendar API:\n' + text)
         raise RuntimeError('Unexpected response from Google Calendar API.')
-    return [parse_event(e, config.linkprefs) for e in raw['items']] 
+    return [parse_event(e, config.linkprefs) for e in raw['items']]
 
 def format_events(config, events):
     logging.debug("Generating plaintext message.")
@@ -295,7 +296,7 @@ class WSGIApplication:
         configure_logging(get('logfile', sys.stderr), getattr(logging, get('loglevel', 'info').upper()))
         args = sum((['--config-file', f] for f in config_files), []) + ['--no-send', '-s']
         return {c:get_config(args + [c]) for c in wsgi_calendars}
-        
+
     def __call__(self, environ, start_response):
         try:
             status, headers, body = self.process_request(environ, start_response)
@@ -313,7 +314,7 @@ class WSGIApplication:
     @classmethod
     def _html_msg(cls, heading, details=''):
         return "<html><head><title>%s</title></head><body><h1>%s</h1>%s</body></html>" % (heading, heading, details)
-    
+
     def process_request(self, environ, start_response):
         status = '200 OK'
         headers = [('Content-Type', 'text/html; charset=UTF-8')]
