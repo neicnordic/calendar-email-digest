@@ -162,7 +162,7 @@ def plaintext_details(event, index, template):
 
 def generate_plaintext_email(events, template, summary_template, details_template):
     return template % dict(
-        date=datetime.datetime.now().strftime("%Y-%m-%D"),
+        date=datetime.datetime.now().strftime("%Y-%m-%d"),
         summary='\n'.join(plaintext_summary(e, i + 1, summary_template) for i, e in enumerate(events)),
         details=('\n\n' + '-'*75 + '\n\n').join(plaintext_details(e, i + 1, details_template) for i, e in enumerate(events)))
 
